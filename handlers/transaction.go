@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"quattrinitrack/database"
 )
 
-func Transaction(queries *database.Queries) http.HandlerFunc {
+type TransactionQuerier interface {
+	GetAllTransactions(ctx context.Context) ([]database.Transaction, error)
+	InsertTransaction(ctx context.Context, params database.InsertTransactionParams) error
+}
+
+func Transaction(queries TransactionQuerier) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		ctx := request.Context()
 		if request.Method == "GET" {
