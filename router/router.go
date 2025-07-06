@@ -9,6 +9,8 @@ import (
 func New(queries *database.Queries) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /transaction", handlers.Transaction)
+	mux.HandleFunc("GET /transaction", handlers.Transaction(queries))
+	mux.HandleFunc("POST /transaction", handlers.Transaction(queries))
+
 	return mux
 }
