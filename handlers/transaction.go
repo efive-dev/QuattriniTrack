@@ -125,9 +125,10 @@ func insertTransaction(w http.ResponseWriter, req *http.Request, ctx context.Con
 	}
 
 	err = queries.InsertTransaction(ctx, database.InsertTransactionParams{
-		Name: transaction.Name,
-		Cost: transaction.Cost,
-		Date: transaction.Date,
+		Name:         transaction.Name,
+		Cost:         transaction.Cost,
+		Date:         transaction.Date,
+		CategoriesID: transaction.CategoriesID,
 	})
 	if err != nil {
 		log.Printf("error in inserting transaction into db %v", err)

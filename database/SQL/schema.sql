@@ -3,10 +3,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   name TEXT NOT NULL,
   cost REAL NOT NULL CHECK (cost > 0),
   date DATETIME NOT NULL,
-  categories_id INTEGER REFERENCES categories_id(id)
+  categories_id INTEGER REFERENCES categories(id) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL
+  name TEXT NOT NULL UNIQUE
 );
+

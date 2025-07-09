@@ -1,6 +1,6 @@
 -- name: InsertTransaction :exec
-INSERT INTO transactions(name, cost, date)
-VALUES (?, ?, ?);
+INSERT INTO transactions(name, cost, date, categories_id)
+VALUES (?, ?, ?, ?);
 
 -- name: GetAllTransactions :many
 SELECT * FROM transactions;

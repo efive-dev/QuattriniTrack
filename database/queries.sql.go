@@ -170,17 +170,23 @@ func (q *Queries) InsertCategory(ctx context.Context, name string) error {
 }
 
 const insertTransaction = `-- name: InsertTransaction :exec
-INSERT INTO transactions(name, cost, date)
-VALUES (?, ?, ?)
+INSERT INTO transactions(name, cost, date, categories_id)
+VALUES (?, ?, ?, ?)
 `
 
 type InsertTransactionParams struct {
-	Name string
-	Cost float64
-	Date time.Time
+	Name         string
+	Cost         float64
+	Date         time.Time
+	CategoriesID int64
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, insertTransaction, arg.Name, arg.Cost, arg.Date)
+	_, err := q.db.ExecContext(ctx, insertTransaction,
+		arg.Name,
+		arg.Cost,
+		arg.Date,
+		arg.CategoriesID,
+	)
 	return err
 }
