@@ -38,9 +38,16 @@ func Category(queries CategoryQuerier) http.HandlerFunc {
 		}
 
 		if req.Method == http.MethodPost {
+			insertCategory(w, req, ctx, queries)
 		}
 
 		if req.Method == http.MethodDelete {
+			id, err := strconv.ParseInt(req.URL.Query().Get("id"), 10, 64)
+			if err != nil {
+				log.Printf("error in converting id")
+				return
+			}
+			deleteCategory(w, ctx, queries, id)
 		}
 	}
 }
@@ -73,5 +80,46 @@ func getCategoryByID(w http.ResponseWriter, ctx context.Context, queries Categor
 	if err != nil {
 		log.Printf("error encoding category %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func insertCategory(w http.ResponseWriter, req *http.Request, ctx context.Context, queries CategoryQuerier) {
+	var category database.Category
+	err := json.NewDecoder(req.Body).Decode(&category)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if category.Name == "" {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = queries.InsertCategory(ctx, category.Name)
+	if err != nil {
+		log.Printf("error with inserting category in db %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	response := map[string]string{"message": "Category created successfully"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func deleteCategory(w http.ResponseWriter, ctx context.Context, queries CategoryQuerier, id int64) {
+	_, err := queries.GetCategoryByID(ctx, id)
+	if err != nil {
+		log.Printf("no category with id %d present", id)
+		http.Error(w, "Status Bad Request", http.StatusBadRequest)
+		return
+	}
+	err = queries.DeleteCategory(ctx, id)
+	if err != nil {
+		log.Printf("could not delete category with id %d", id)
+		http.Error(w, "Status Bad Request", http.StatusBadRequest)
+		return
 	}
 }

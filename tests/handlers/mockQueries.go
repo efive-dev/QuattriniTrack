@@ -12,6 +12,7 @@ type MockQueries struct {
 }
 
 // Transactions
+
 func (m *MockQueries) GetAllTransactions(ctx context.Context) ([]database.Transaction, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]database.Transaction), args.Error(1)
@@ -38,6 +39,7 @@ func (m *MockQueries) InsertTransaction(ctx context.Context, params database.Ins
 }
 
 // Categories
+
 func (m *MockQueries) GetAllCategories(ctx context.Context) ([]database.Category, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]database.Category), args.Error(1)
