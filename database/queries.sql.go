@@ -10,12 +10,75 @@ import (
 	"time"
 )
 
+const deleteTransaction = `-- name: DeleteTransaction :exec
+DELETE
+FROM transactions
+WHERE id = ?
+`
+
+func (q *Queries) DeleteTransaction(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteTransaction, id)
+	return err
+}
+
 const getAllTransactions = `-- name: GetAllTransactions :many
 SELECT id, name, cost, date FROM transactions
 `
 
 func (q *Queries) GetAllTransactions(ctx context.Context) ([]Transaction, error) {
 	rows, err := q.db.QueryContext(ctx, getAllTransactions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Cost,
+			&i.Date,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTransactionByID = `-- name: GetTransactionByID :one
+SELECT id, name, cost, date
+FROM transactions
+WHERE id = ?
+`
+
+func (q *Queries) GetTransactionByID(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRowContext(ctx, getTransactionByID, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Cost,
+		&i.Date,
+	)
+	return i, err
+}
+
+const getTransactionByName = `-- name: GetTransactionByName :many
+SELECT id, name, cost, date
+FROM transactions
+WHERE name = ?
+`
+
+func (q *Queries) GetTransactionByName(ctx context.Context, name string) ([]Transaction, error) {
+	rows, err := q.db.QueryContext(ctx, getTransactionByName, name)
 	if err != nil {
 		return nil, err
 	}
