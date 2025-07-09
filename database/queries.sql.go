@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+const deleteCategory = `-- name: DeleteCategory :exec
+DELETE
+FROM categories
+WHERE id = ?
+`
+
+func (q *Queries) DeleteCategory(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteCategory, id)
+	return err
+}
+
 const deleteTransaction = `-- name: DeleteTransaction :exec
 DELETE
 FROM transactions
@@ -21,8 +32,35 @@ func (q *Queries) DeleteTransaction(ctx context.Context, id int64) error {
 	return err
 }
 
+const getAllCategories = `-- name: GetAllCategories :many
+SELECT id, name FROM categories
+`
+
+func (q *Queries) GetAllCategories(ctx context.Context) ([]Category, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Category
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllTransactions = `-- name: GetAllTransactions :many
-SELECT id, name, cost, date FROM transactions
+SELECT id, name, cost, date, categories_id FROM transactions
 `
 
 func (q *Queries) GetAllTransactions(ctx context.Context) ([]Transaction, error) {
@@ -39,6 +77,7 @@ func (q *Queries) GetAllTransactions(ctx context.Context) ([]Transaction, error)
 			&i.Name,
 			&i.Cost,
 			&i.Date,
+			&i.CategoriesID,
 		); err != nil {
 			return nil, err
 		}
@@ -53,8 +92,21 @@ func (q *Queries) GetAllTransactions(ctx context.Context) ([]Transaction, error)
 	return items, nil
 }
 
+const getCategoryByID = `-- name: GetCategoryByID :one
+SELECT id, name
+FROM categories
+WHERE id = ?
+`
+
+func (q *Queries) GetCategoryByID(ctx context.Context, id int64) (Category, error) {
+	row := q.db.QueryRowContext(ctx, getCategoryByID, id)
+	var i Category
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const getTransactionByID = `-- name: GetTransactionByID :one
-SELECT id, name, cost, date
+SELECT id, name, cost, date, categories_id
 FROM transactions
 WHERE id = ?
 `
@@ -67,12 +119,13 @@ func (q *Queries) GetTransactionByID(ctx context.Context, id int64) (Transaction
 		&i.Name,
 		&i.Cost,
 		&i.Date,
+		&i.CategoriesID,
 	)
 	return i, err
 }
 
 const getTransactionByName = `-- name: GetTransactionByName :many
-SELECT id, name, cost, date
+SELECT id, name, cost, date, categories_id
 FROM transactions
 WHERE name = ?
 `
@@ -91,6 +144,7 @@ func (q *Queries) GetTransactionByName(ctx context.Context, name string) ([]Tran
 			&i.Name,
 			&i.Cost,
 			&i.Date,
+			&i.CategoriesID,
 		); err != nil {
 			return nil, err
 		}
@@ -103,6 +157,16 @@ func (q *Queries) GetTransactionByName(ctx context.Context, name string) ([]Tran
 		return nil, err
 	}
 	return items, nil
+}
+
+const insertCategory = `-- name: InsertCategory :exec
+INSERT INTO categories(name)
+VALUES (?)
+`
+
+func (q *Queries) InsertCategory(ctx context.Context, name string) error {
+	_, err := q.db.ExecContext(ctx, insertCategory, name)
+	return err
 }
 
 const insertTransaction = `-- name: InsertTransaction :exec

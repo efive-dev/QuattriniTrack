@@ -5,12 +5,19 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 )
 
-type Transaction struct {
+type Category struct {
 	ID   int64
 	Name string
-	Cost float64
-	Date time.Time
+}
+
+type Transaction struct {
+	ID           int64
+	Name         string
+	Cost         float64
+	Date         time.Time
+	CategoriesID sql.NullInt64
 }

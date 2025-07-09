@@ -19,3 +19,20 @@ WHERE name = ?;
 DELETE
 FROM transactions
 WHERE id = ?;
+
+-- name: InsertCategory :exec
+INSERT INTO categories(name)
+VALUES (?);
+
+-- name: GetAllCategories :many
+SELECT * FROM categories;
+
+-- name: GetCategoryByID :one
+SELECT *
+FROM categories
+WHERE id = ?;
+
+-- name: DeleteCategory :exec
+DELETE
+FROM categories
+WHERE id = ?;
