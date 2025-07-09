@@ -2,9 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"quattrinitrack/database"
 	"quattrinitrack/handlers"
 	"testing"
@@ -13,6 +18,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func TestMain(m *testing.M) {
+	// Disable logging for all tests
+	log.SetOutput(io.Discard)
+
+	// Run tests
+	code := m.Run()
+
+	// Restore logging
+	log.SetOutput(os.Stderr)
+
+	os.Exit(code)
+}
 
 // GET request /transaction
 func TestTransactionGETHeaderAndCode(t *testing.T) {
@@ -38,6 +56,77 @@ func TestTransactionGETResponse(t *testing.T) {
 	}
 
 	mockQueries.AssertExpectations(t)
+}
+
+// getTransactionByID /transaction/?id=someid
+func TestGetTransactionByIDSuccess(t *testing.T) {
+	var actualTransaction database.Transaction
+	_, _, expectedTransactions, _ := setupTransactionGetTest()
+
+	mockQueries := new(MockQueries)
+	mockQueries.On("GetTransactionByID", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(expectedTransactions[0], nil)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("GET", "/transaction/?id=1", nil)
+	w := httptest.NewRecorder()
+
+	handler(w, req)
+
+	err := json.NewDecoder(w.Body).Decode(&actualTransaction)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedTransactions[0].ID, actualTransaction.ID)
+	assert.Equal(t, expectedTransactions[0].Name, actualTransaction.Name)
+	assert.Equal(t, expectedTransactions[0].Cost, actualTransaction.Cost)
+	assert.WithinDuration(t, expectedTransactions[0].Date, actualTransaction.Date, time.Second)
+}
+
+func TestGetTransactionByIDError(t *testing.T) {
+	mockQueries := new(MockQueries)
+	mockQueries.On("GetTransactionByID", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(database.Transaction{}, sql.ErrNoRows)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("GET", "/transaction/?id=89", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+// getTransactionByName /transaction/?name=someName
+func TestGetTransactionByNameSuccess(t *testing.T) {
+	var actualTransaction []database.Transaction
+	_, _, expectedTransactions, _ := setupTransactionGetTest()
+
+	mockQueries := new(MockQueries)
+	mockQueries.On("GetTransactionByName", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("string")).Return(expectedTransactions, nil)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("GET", "/transaction/?name=Coffee", nil)
+	w := httptest.NewRecorder()
+
+	handler(w, req)
+
+	err := json.NewDecoder(w.Body).Decode(&actualTransaction)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedTransactions[0].ID, actualTransaction[0].ID)
+	assert.Equal(t, expectedTransactions[0].Name, actualTransaction[0].Name)
+	assert.Equal(t, expectedTransactions[0].Cost, actualTransaction[0].Cost)
+	assert.WithinDuration(t, expectedTransactions[0].Date, actualTransaction[0].Date, time.Second)
+}
+
+func TestGetTransactionByNameError(t *testing.T) {
+	mockQueries := new(MockQueries)
+	// Return empty slice for "not found"
+	mockQueries.On("GetTransactionByName", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("string")).Return([]database.Transaction{}, nil)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("GET", "/transaction/?name=NonExistent", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func setupTransactionGetTest() (*httptest.ResponseRecorder, *http.Request, []database.Transaction, *MockQueries) {
@@ -140,4 +229,55 @@ func setupTransactionPostTest() (*httptest.ResponseRecorder, *http.Request, data
 	handler(w, req)
 
 	return w, req, transaction, mockQueries
+}
+
+// deleteTransaction DELETE /transaction/?id=someid
+func TestDeleteTransactionSuccess(t *testing.T) {
+	_, _, expectedTransactions, _ := setupTransactionGetTest()
+	mockQueries := new(MockQueries)
+
+	mockQueries.On("GetTransactionByID", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(expectedTransactions[0], nil)
+	mockQueries.On("DeleteTransaction", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(nil)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("DELETE", "/transaction/?id=1", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	mockQueries.AssertExpectations(t)
+}
+
+func TestDeleteTransactionNotFound(t *testing.T) {
+	mockQueries := new(MockQueries)
+
+	mockQueries.On("GetTransactionByID", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(database.Transaction{}, sql.ErrNoRows)
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("DELETE", "/transaction/?id=999", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	mockQueries.AssertExpectations(t)
+}
+
+func TestDeleteTransactionDeleteError(t *testing.T) {
+	_, _, expectedTransactions, _ := setupTransactionGetTest()
+	mockQueries := new(MockQueries)
+
+	mockQueries.On("GetTransactionByID", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(expectedTransactions[0], nil)
+
+	mockQueries.On("DeleteTransaction", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("int64")).Return(errors.New("database error"))
+
+	handler := handlers.Transaction(mockQueries)
+	req := httptest.NewRequest("DELETE", "/transaction/?id=1", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	mockQueries.AssertExpectations(t)
 }
