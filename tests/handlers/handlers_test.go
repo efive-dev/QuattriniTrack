@@ -1,46 +1,55 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"quattrinitrack/database"
 	"quattrinitrack/handlers"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-func TestTransactionGETSuccess(t *testing.T) {
-	mock := &MockQueries{
-		transactions: []database.Transaction{
-			{Name: "Coffee", Cost: 5.50, Date: time.Now()},
-		},
-	}
+// GET request /transaction
+func TestTransactionGETHeaderAndCode(t *testing.T) {
+	w, _, _ := setupTransactionGetTest()
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+}
 
-	handler := handlers.Transaction(mock)
-	req := httptest.NewRequest("GET", "/transaction", nil)
-	w := httptest.NewRecorder()
+func TestTransactionGETResponse(t *testing.T) {
+	var responseTransactions []database.Transaction
+	w, _, expectedTransactions := setupTransactionGetTest()
 
-	handler(w, req)
+	err := json.NewDecoder(w.Body).Decode(&responseTransactions)
+	assert.NoError(t, err)
+	assert.Len(t, responseTransactions, len(expectedTransactions))
 
-	if w.Code != http.StatusOK {
-		t.Errorf("want 200, got %d", w.Code)
-	}
-
-	if w.Header().Get("Content-Type") != "application/json" {
-		t.Error("want application/json content type")
+	for i, expected := range expectedTransactions {
+		actual := responseTransactions[i]
+		assert.Equal(t, expected.Name, actual.Name, "at index %d", i)
+		assert.Equal(t, expected.Cost, actual.Cost, "at index %d", i)
+		assert.WithinDuration(t, expected.Date, actual.Date, time.Second, "at index %d", i)
 	}
 }
 
-func TestTransactionGETFaiulure(t *testing.T) {
-	mock := &MockQueries{shouldError: true}
+func setupTransactionGetTest() (*httptest.ResponseRecorder, *http.Request, []database.Transaction) {
+	expectedTransactions := []database.Transaction{
+		{Name: "Coffee", Cost: 5.50, Date: time.Now()},
+		{Name: "Hamburger", Cost: 12.00, Date: time.Now()},
+	}
 
-	handler := handlers.Transaction(mock)
+	mockQueries := new(MockQueries)
+	mockQueries.On("GetAllTransactions", mock.AnythingOfType("context.backgroundCtx")).Return(expectedTransactions, nil)
+
+	handler := handlers.Transaction(mockQueries)
 	req := httptest.NewRequest("GET", "/transaction", nil)
 	w := httptest.NewRecorder()
 
 	handler(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("request should return 500 code, got %v instead", http.StatusInternalServerError)
-	}
+	return w, req, expectedTransactions
 }

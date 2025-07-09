@@ -2,25 +2,21 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"quattrinitrack/database"
+
+	"github.com/stretchr/testify/mock"
 )
 
 type MockQueries struct {
-	shouldError  bool
-	transactions []database.Transaction
+	mock.Mock
 }
 
 func (m *MockQueries) GetAllTransactions(ctx context.Context) ([]database.Transaction, error) {
-	if m.shouldError {
-		return nil, errors.New("db error")
-	}
-	return m.transactions, nil
+	args := m.Called(ctx)
+	return args.Get(0).([]database.Transaction), args.Error(1)
 }
 
 func (m *MockQueries) InsertTransaction(ctx context.Context, params database.InsertTransactionParams) error {
-	if m.shouldError {
-		return errors.New("db error")
-	}
-	return nil
+	args := m.Called(ctx)
+	return args.Error(0)
 }
