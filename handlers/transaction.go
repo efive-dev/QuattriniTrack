@@ -20,7 +20,7 @@ type TransactionQuerier interface {
 func Transaction(queries TransactionQuerier) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		if req.Method == "GET" {
+		if req.Method == http.MethodGet {
 			id := req.URL.Query().Get("id")
 			name := req.URL.Query().Get("name")
 			switch {
@@ -36,11 +36,23 @@ func Transaction(queries TransactionQuerier) http.HandlerFunc {
 			case id != "" && name != "":
 				getAllTransactions(w, ctx, queries)
 
+			default:
+				getAllTransactions(w, ctx, queries)
 			}
 		}
 
-		if req.Method == "POST" {
+		if req.Method == http.MethodPost {
 			insertTransaction(w, req, ctx, queries)
+		}
+
+		if req.Method == http.MethodDelete {
+			id := req.URL.Query().Get("id")
+			idNum, err := strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				log.Printf("error in converting id")
+				return
+			}
+			deleteTransaction(w, ctx, queries, idNum)
 		}
 	}
 }
@@ -125,4 +137,19 @@ func insertTransaction(w http.ResponseWriter, req *http.Request, ctx context.Con
 	w.WriteHeader(http.StatusCreated)
 	response := map[string]string{"message": "Transaction created successfully"}
 	json.NewEncoder(w).Encode(response)
+}
+
+func deleteTransaction(w http.ResponseWriter, ctx context.Context, queries TransactionQuerier, id int64) {
+	_, err := queries.GetTransactionByID(ctx, id)
+	if err != nil {
+		log.Printf("no transaction with id %v present", id)
+		http.Error(w, "Status Bad Request", http.StatusBadRequest)
+		return
+	}
+	err = queries.DeleteTransaction(ctx, id)
+	if err != nil {
+		log.Printf("can not delete transaction with id %d", id)
+		http.Error(w, "Status Bad Request", http.StatusBadRequest)
+		return
+	}
 }

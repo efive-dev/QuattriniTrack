@@ -11,6 +11,7 @@ func New(queries *database.Queries) http.Handler {
 
 	mux.HandleFunc("GET /transaction", handlers.Transaction(queries))
 	mux.HandleFunc("POST /transaction", handlers.Transaction(queries))
+	mux.HandleFunc("DELETE /transaction", handlers.Transaction(queries))
 
 	return mux
 }
