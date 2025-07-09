@@ -1,3 +1,4 @@
+// Package handlers defines the functions to handle each endpoint
 package handlers
 
 import (
@@ -20,6 +21,7 @@ type TransactionQuerier interface {
 func Transaction(queries TransactionQuerier) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
+
 		if req.Method == http.MethodGet {
 			id := req.URL.Query().Get("id")
 			name := req.URL.Query().Get("name")

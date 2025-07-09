@@ -1,3 +1,4 @@
+// Package router defines the endpoints and the type of requests for those endpoints
 package router
 
 import (
@@ -14,6 +15,8 @@ func New(queries *database.Queries) http.Handler {
 	mux.HandleFunc("DELETE /transaction", handlers.Transaction(queries))
 
 	mux.HandleFunc("GET /category", handlers.Category(queries))
+	mux.HandleFunc("POST /category", handlers.Category(queries))
+	mux.HandleFunc("DELETE /category", handlers.Category(queries))
 
 	return mux
 }
