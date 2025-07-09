@@ -40,7 +40,7 @@ func Transaction(queries TransactionQuerier) http.HandlerFunc {
 				return
 			}
 
-			if transaction.Name == "" || transaction.Cost == 0 || transaction.Date.IsZero() {
+			if transaction.Name == "" || transaction.Cost <= 0 || transaction.Date.IsZero() {
 				http.Error(writer, "invalid JSON", http.StatusBadRequest)
 				return
 			}

@@ -17,6 +17,6 @@ func (m *MockQueries) GetAllTransactions(ctx context.Context) ([]database.Transa
 }
 
 func (m *MockQueries) InsertTransaction(ctx context.Context, params database.InsertTransactionParams) error {
-	args := m.Called(ctx)
+	args := m.Called(ctx, params)
 	return args.Error(0)
 }
