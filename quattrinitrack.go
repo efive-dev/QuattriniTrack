@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"log"
 	"net/http"
+	"quattrinitrack/config"
 	"quattrinitrack/database"
 	"quattrinitrack/router"
 
@@ -52,6 +53,8 @@ func initDB(ctx context.Context) *sql.DB {
 }
 
 func main() {
+	config.LoadEnv()
+
 	ctx := context.Background()
 	db := initDB(ctx)
 	queries := database.New(db)

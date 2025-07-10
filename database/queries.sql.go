@@ -10,6 +10,29 @@ import (
 	"time"
 )
 
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (email, password_hash)
+VALUES (?, ?)
+RETURNING id, email
+`
+
+type CreateUserParams struct {
+	Email        string
+	PasswordHash string
+}
+
+type CreateUserRow struct {
+	ID    int64
+	Email string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.PasswordHash)
+	var i CreateUserRow
+	err := row.Scan(&i.ID, &i.Email)
+	return i, err
+}
+
 const deleteCategory = `-- name: DeleteCategory :exec
 DELETE
 FROM categories
@@ -192,6 +215,17 @@ func (q *Queries) GetTransactionByName(ctx context.Context, name string) ([]Tran
 		return nil, err
 	}
 	return items, nil
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, password_hash FROM users WHERE email = ?
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
+	return i, err
 }
 
 const insertCategory = `-- name: InsertCategory :exec

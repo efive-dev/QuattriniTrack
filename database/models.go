@@ -20,3 +20,9 @@ type Transaction struct {
 	Date         time.Time
 	CategoriesID int64
 }
+
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash string
+}

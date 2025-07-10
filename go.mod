@@ -3,7 +3,11 @@ module quattrinitrack
 go 1.24.4
 
 require (
+	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/lpernett/godotenv v0.0.0-20230527005122-0de1d4c5ef5e
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/crypto v0.39.0
 	modernc.org/sqlite v1.38.0
 )
 
