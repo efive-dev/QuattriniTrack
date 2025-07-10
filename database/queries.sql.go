@@ -105,6 +105,41 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id int64) (Category, erro
 	return i, err
 }
 
+const getTransactionByCategoryID = `-- name: GetTransactionByCategoryID :many
+SELECT id, name, cost, date, categories_id
+FROM transactions
+WHERE categories_id = ?
+`
+
+func (q *Queries) GetTransactionByCategoryID(ctx context.Context, categoriesID int64) ([]Transaction, error) {
+	rows, err := q.db.QueryContext(ctx, getTransactionByCategoryID, categoriesID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Cost,
+			&i.Date,
+			&i.CategoriesID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTransactionByID = `-- name: GetTransactionByID :one
 SELECT id, name, cost, date, categories_id
 FROM transactions

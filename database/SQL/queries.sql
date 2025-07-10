@@ -15,6 +15,11 @@ SELECT *
 FROM transactions
 WHERE name = ?;
 
+-- name: GetTransactionByCategoryID :many
+SELECT *
+FROM transactions
+WHERE categories_id = ?;
+
 -- name: DeleteTransaction :exec
 DELETE
 FROM transactions
@@ -36,3 +41,11 @@ WHERE id = ?;
 DELETE
 FROM categories
 WHERE id = ?;
+
+-- name: CreateUser :one
+INSERT INTO users (email, password_hash)
+VALUES (?, ?)
+RETURNING id, email;
+
+-- name: GetUserByEmail :one
+SELECT id, email, password_hash FROM users WHERE email = ?;

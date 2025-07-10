@@ -14,6 +14,7 @@ type TransactionQuerier interface {
 	GetAllTransactions(ctx context.Context) ([]database.Transaction, error)
 	GetTransactionByID(ctx context.Context, id int64) (database.Transaction, error)
 	GetTransactionByName(ctx context.Context, name string) ([]database.Transaction, error)
+	GetTransactionByCategoryID(ctx context.Context, categoryID int64) ([]database.Transaction, error) // Fixed typo: cetegoryID -> categoryID
 	DeleteTransaction(ctx context.Context, id int64) error
 	InsertTransaction(ctx context.Context, params database.InsertTransactionParams) error
 }
@@ -25,6 +26,7 @@ func Transaction(queries TransactionQuerier) http.HandlerFunc {
 		if req.Method == http.MethodGet {
 			id := req.URL.Query().Get("id")
 			name := req.URL.Query().Get("name")
+			categoryID := req.URL.Query().Get("categoriesid")
 			switch {
 			case id != "":
 				id, err := strconv.ParseInt(id, 10, 64)
@@ -35,9 +37,13 @@ func Transaction(queries TransactionQuerier) http.HandlerFunc {
 				getTransactionByID(w, ctx, queries, id)
 			case name != "":
 				getTransactionByName(w, ctx, queries, name)
-			case id != "" && name != "":
-				getAllTransactions(w, ctx, queries)
-
+			case categoryID != "":
+				categoryID, err := strconv.ParseInt(categoryID, 10, 64)
+				if err != nil {
+					log.Printf("error in converting category id")
+					return
+				}
+				getTransactionByCategory(w, ctx, queries, categoryID)
 			default:
 				getAllTransactions(w, ctx, queries)
 			}
@@ -87,6 +93,7 @@ func getTransactionByID(w http.ResponseWriter, ctx context.Context, queries Tran
 	if err != nil {
 		log.Printf("error encoding transaction %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -108,6 +115,24 @@ func getTransactionByName(w http.ResponseWriter, ctx context.Context, queries Tr
 	if err != nil {
 		log.Printf("error encoding transactions %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func getTransactionByCategory(w http.ResponseWriter, ctx context.Context, queries TransactionQuerier, categoryID int64) {
+	transactions, err := queries.GetTransactionByCategoryID(ctx, categoryID)
+	if err != nil {
+		log.Printf("error getting transactions with categoryID %d, %v", categoryID, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(transactions)
+	if err != nil {
+		log.Printf("error encoding transactions %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 }
 

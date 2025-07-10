@@ -28,6 +28,11 @@ func (m *MockQueries) GetTransactionByName(ctx context.Context, name string) ([]
 	return args.Get(0).([]database.Transaction), args.Error(1)
 }
 
+func (m *MockQueries) GetTransactionByCategoryID(ctx context.Context, categoryID int64) ([]database.Transaction, error) {
+	args := m.Called(ctx, categoryID)
+	return args.Get(0).([]database.Transaction), args.Error(1)
+}
+
 func (m *MockQueries) DeleteTransaction(ctx context.Context, id int64) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
