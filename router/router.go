@@ -17,19 +17,17 @@ func New(queries *database.Queries) http.Handler {
 
 	// Protected routes
 	protected := http.NewServeMux()
-
 	protected.HandleFunc("GET /transaction", handlers.Transaction(queries))
 	protected.HandleFunc("POST /transaction", handlers.Transaction(queries))
 	protected.HandleFunc("DELETE /transaction", handlers.Transaction(queries))
-
 	protected.HandleFunc("GET /category", handlers.Category(queries))
 	protected.HandleFunc("POST /category", handlers.Category(queries))
 	protected.HandleFunc("DELETE /category", handlers.Category(queries))
-
 	protected.HandleFunc("GET /me", handlers.Me(queries))
 
-	// Mount protected routes under middleware
+	// Mount protected routes under auth middleware
 	mux.Handle("/", middleware.AuthMiddleware(protected.ServeHTTP))
 
-	return mux
+	// Wrap the entire mux with request logging middleware
+	return middleware.RequestLogger(mux)
 }
