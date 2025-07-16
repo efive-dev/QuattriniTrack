@@ -1,3 +1,4 @@
+// Package logger implements a custom logger to display info in the tui
 package logger
 
 import (

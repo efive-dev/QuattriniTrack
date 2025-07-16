@@ -28,12 +28,10 @@ func initDB(ctx context.Context) *sql.DB {
 		panic(err)
 	}
 
-	// Test the connection
 	if err := db.PingContext(ctx); err != nil {
 		panic(err)
 	}
 
-	// Explicitly enable foreign keys (double check)
 	_, err = db.ExecContext(ctx, "PRAGMA foreign_keys = ON")
 	if err != nil {
 		panic(err)
@@ -49,7 +47,6 @@ func initDB(ctx context.Context) *sql.DB {
 		panic("Foreign key constraints are not enabled")
 	}
 
-	// Create tables (make sure categories table is created first)
 	_, err = db.ExecContext(ctx, createTables)
 	if err != nil {
 		panic(err)
@@ -59,10 +56,8 @@ func initDB(ctx context.Context) *sql.DB {
 }
 
 func main() {
-	// Setup log capture system first
 	logger.SetupLogCapture()
 
-	// Load configuration
 	config.LoadEnv()
 
 	// Initialize database
@@ -101,21 +96,17 @@ func main() {
 
 	// Start the TUI in a goroutine
 	go func() {
-		// Initialize and run the TUI (this will block until the user quits)
 		tui.Init()
 		tuiDone <- nil
 	}()
 
-	// Wait for either TUI to quit, server to fail, or shutdown signal
 	select {
 	case err := <-tuiDone:
-		// TUI quit, shutdown server gracefully
 		log.Println("TUI shutting down...")
 		if err != nil {
 			log.Printf("TUI error: %v", err)
 		}
 
-		// Graceful shutdown with timeout
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -126,7 +117,6 @@ func main() {
 		}
 
 	case err := <-serverDone:
-		// Server failed or stopped
 		if err != nil {
 			log.Printf("Server error: %v", err)
 		}
@@ -136,7 +126,6 @@ func main() {
 		// Received shutdown signal
 		log.Printf("Received signal: %v", sig)
 
-		// Graceful shutdown with timeout
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -147,6 +136,5 @@ func main() {
 		}
 	}
 
-	// Final cleanup
 	log.Println("Application shutting down...")
 }

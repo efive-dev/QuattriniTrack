@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,12 +13,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserStore is an interface for interacting with users in the database.
+type UserStore interface {
+	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error)
+	GetUserByEmail(ctx context.Context, email string) (database.User, error)
+}
+
+// AuthRequest is the structure for the user credentials.
 type AuthRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-func Register(queries *database.Queries) http.HandlerFunc {
+// Register handles user registration.
+func Register(queries UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var reqAuth AuthRequest
 		err := json.NewDecoder(req.Body).Decode(&reqAuth)
@@ -28,7 +37,7 @@ func Register(queries *database.Queries) http.HandlerFunc {
 
 		hash, err := bcrypt.GenerateFromPassword([]byte(reqAuth.Password), bcrypt.DefaultCost)
 		if err != nil {
-			log.Printf("error in encryptinc password %v", err)
+			log.Printf("error in encrypting password %v", err)
 			return
 		}
 
@@ -46,7 +55,8 @@ func Register(queries *database.Queries) http.HandlerFunc {
 	}
 }
 
-func Login(queries *database.Queries) http.HandlerFunc {
+// Login handles user login.
+func Login(queries UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var reqAuth AuthRequest
 		err := json.NewDecoder(req.Body).Decode(&reqAuth)
@@ -78,7 +88,8 @@ func Login(queries *database.Queries) http.HandlerFunc {
 	}
 }
 
-func Me(queries *database.Queries) http.HandlerFunc {
+// Me returns the current user ID.
+func Me(queries UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		userID := req.Context().Value("userID").(int64)
 		w.Header().Set("Content-Type", "application/json")
