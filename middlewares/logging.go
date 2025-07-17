@@ -1,3 +1,4 @@
+// Package middleware implements both the auth middleware and logging middleware
 package middleware
 
 import (

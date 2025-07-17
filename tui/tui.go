@@ -1,13 +1,17 @@
-// package tui implements the tui for the app
+// Package tui implements the tui for the app
 package tui
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"quattrinitrack/logger"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -15,35 +19,49 @@ import (
 
 var (
 	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFDF5")).
-			Background(lipgloss.Color("#25A065")).
+			Foreground(lipgloss.Color("#fc595f")).
+			Background(lipgloss.Color("#252525")).
 			Padding(0, 1)
 
 	infoStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("240"))
+			BorderForeground(lipgloss.Color("#FFFDF5"))
 
 	logStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
+			Foreground(lipgloss.Color("#ffffff"))
 
 	errorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196"))
 
 	timestampStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("99"))
+			Foreground(lipgloss.Color("#a63c40"))
 
 	menuStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("255")).
 			Padding(1, 2)
 
 	selectedMenuStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FFFDF5")).
-				Background(lipgloss.Color("#25A065")).
+				Foreground(lipgloss.Color("#fc595f")).
+				Background(lipgloss.Color("#252525")).
 				Padding(0, 1)
 
 	menuItemStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("246")).
+			Foreground(lipgloss.Color("#ffffff")).
 			Padding(0, 2)
+
+	inputStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffffff")).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("#fc595f")).
+			Padding(1, 2)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42"))
+
+	focusedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#fc595f"))
+
+	noStyle = lipgloss.NewStyle()
 )
 
 type screen int
@@ -51,6 +69,14 @@ type screen int
 const (
 	menuScreen screen = iota
 	logsScreen
+	authScreen
+)
+
+type authMode int
+
+const (
+	loginMode authMode = iota
+	registerMode
 )
 
 type keyMap struct {
@@ -61,6 +87,7 @@ type keyMap struct {
 	clear key.Binding
 	enter key.Binding
 	back  key.Binding
+	tab   key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
@@ -103,11 +130,24 @@ var keys = keyMap{
 		key.WithKeys("esc", "backspace"),
 		key.WithHelp("esc", "back to menu"),
 	),
+	tab: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "next field"),
+	),
 }
 
 type menuItem struct {
 	title       string
 	description string
+}
+
+type authRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type authResponse struct {
+	Token string `json:"token"`
 }
 
 type model struct {
@@ -120,6 +160,15 @@ type model struct {
 	selectedItem  int
 	width         int
 	height        int
+
+	// Auth fields
+	authMode      authMode
+	emailInput    textinput.Model
+	passwordInput textinput.Model
+	focusedInput  int
+	authMessage   string
+	authToken     string
+	isLoggedIn    bool
 }
 
 type tickMsg time.Time
@@ -164,11 +213,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.ready {
 						m.viewport.SetContent(m.formatLogs())
 					}
-				case 1: // About
-					// Could implement about screen here
-				case 2: // Settings
-					// Could implement settings screen here
-				case 3: // Exit
+				case 1: // Login/Register
+					m.currentScreen = authScreen
+					m.authMode = loginMode
+					m.authMessage = ""
+					m.focusedInput = 0
+					m.emailInput.Focus()
+					m.passwordInput.Blur()
+				case 2: // Exit
 					return m, tea.Quit
 				}
 			}
@@ -188,6 +240,63 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Handle viewport navigation
 				m.viewport, cmd = m.viewport.Update(msg)
 				cmds = append(cmds, cmd)
+			}
+
+		case authScreen:
+			switch {
+			case key.Matches(msg, keys.quit):
+				return m, tea.Quit
+			case msg.String() == "esc":
+				// Only handle escape key for going back, not backspace
+				m.currentScreen = menuScreen
+			case key.Matches(msg, keys.tab):
+				m.focusedInput = (m.focusedInput + 1) % 2
+				if m.focusedInput == 0 {
+					m.emailInput.Focus()
+					m.passwordInput.Blur()
+				} else {
+					m.emailInput.Blur()
+					m.passwordInput.Focus()
+				}
+			case key.Matches(msg, keys.enter):
+				// Submit auth request
+				email := m.emailInput.Value()
+				password := m.passwordInput.Value()
+
+				if email == "" || password == "" {
+					m.authMessage = "Email and password are required"
+					break
+				}
+
+				// Perform auth request
+				err := m.performAuth(email, password)
+				if err != nil {
+					m.authMessage = fmt.Sprintf("Error: %v", err)
+				} else {
+					if m.authMode == loginMode {
+						m.authMessage = "Login successful!"
+						m.isLoggedIn = true
+					} else {
+						m.authMessage = "Registration successful!"
+					}
+				}
+			case msg.String() == "ctrl+r":
+				// Toggle between login and register (use Ctrl+R to avoid conflicts)
+				if m.authMode == loginMode {
+					m.authMode = registerMode
+				} else {
+					m.authMode = loginMode
+				}
+				m.authMessage = ""
+			default:
+				// Update text inputs for all other keys (including 'r' and backspace)
+				if m.focusedInput == 0 {
+					m.emailInput, cmd = m.emailInput.Update(msg)
+					cmds = append(cmds, cmd)
+				} else {
+					m.passwordInput, cmd = m.passwordInput.Update(msg)
+					cmds = append(cmds, cmd)
+				}
 			}
 		}
 
@@ -221,6 +330,45 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *model) performAuth(email, password string) error {
+	authReq := authRequest{
+		Email:    email,
+		Password: password,
+	}
+
+	jsonData, err := json.Marshal(authReq)
+	if err != nil {
+		return err
+	}
+
+	var endpoint string
+	if m.authMode == loginMode {
+		endpoint = "http://localhost:8080/login"
+	} else {
+		endpoint = "http://localhost:8080/register"
+	}
+
+	resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("authentication failed with status: %d", resp.StatusCode)
+	}
+
+	if m.authMode == loginMode {
+		var authResp authResponse
+		if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
+			return err
+		}
+		m.authToken = authResp.Token
+	}
+
+	return nil
+}
+
 func (m model) View() string {
 	if !m.ready {
 		return "\n  Initializing..."
@@ -231,6 +379,8 @@ func (m model) View() string {
 		return m.menuView()
 	case logsScreen:
 		return fmt.Sprintf("%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView())
+	case authScreen:
+		return m.authView()
 	default:
 		return m.menuView()
 	}
@@ -242,6 +392,11 @@ func (m model) menuView() string {
 	// Header
 	title := titleStyle.Render("QuattriniTrack - Main Menu")
 	s.WriteString(title + "\n\n")
+
+	// Login status
+	if m.isLoggedIn {
+		s.WriteString(successStyle.Render("✓ Logged in") + "\n\n")
+	}
 
 	// Menu items
 	for i, item := range m.menuItems {
@@ -267,6 +422,58 @@ func (m model) menuView() string {
 		s.WriteString("↑/k: move up • ↓/j: move down • enter: select • ?: toggle help • q: quit\n")
 	} else {
 		s.WriteString("Press ? for help\n")
+	}
+
+	return s.String()
+}
+
+func (m model) authView() string {
+	var s strings.Builder
+
+	// Header
+	var title string
+	if m.authMode == loginMode {
+		title = titleStyle.Render("QuattriniTrack - Login")
+	} else {
+		title = titleStyle.Render("QuattriniTrack - Register")
+	}
+	s.WriteString(title + "\n\n")
+
+	// Email input
+	s.WriteString("Email:\n")
+	if m.focusedInput == 0 {
+		s.WriteString(inputStyle.Render(m.emailInput.View()))
+	} else {
+		s.WriteString(noStyle.Render(m.emailInput.View()))
+	}
+	s.WriteString("\n\n")
+
+	// Password input
+	s.WriteString("Password:\n")
+	if m.focusedInput == 1 {
+		s.WriteString(inputStyle.Render(m.passwordInput.View()))
+	} else {
+		s.WriteString(noStyle.Render(m.passwordInput.View()))
+	}
+	s.WriteString("\n\n")
+
+	// Auth message
+	if m.authMessage != "" {
+		if strings.Contains(m.authMessage, "successful") {
+			s.WriteString(successStyle.Render(m.authMessage))
+		} else {
+			s.WriteString(errorStyle.Render(m.authMessage))
+		}
+		s.WriteString("\n\n")
+	}
+
+	// Instructions
+	s.WriteString("Tab: next field • Enter: submit • Ctrl+R: toggle login/register • Esc: back to menu\n")
+
+	if m.authMode == loginMode {
+		s.WriteString("Press 'Ctrl+R' to switch to register mode\n")
+	} else {
+		s.WriteString("Press 'Ctrl+R' to switch to login mode\n")
 	}
 
 	return s.String()
@@ -333,6 +540,19 @@ func Init() {
 	// Enable log suppression so logs don't appear in console
 	logger.SetSuppress(true)
 
+	// Initialize text inputs
+	emailInput := textinput.New()
+	emailInput.Placeholder = "Enter your email"
+	emailInput.CharLimit = 50
+	emailInput.Width = 30
+
+	passwordInput := textinput.New()
+	passwordInput.Placeholder = "Enter your password"
+	passwordInput.CharLimit = 50
+	passwordInput.Width = 30
+	passwordInput.EchoMode = textinput.EchoPassword
+	passwordInput.EchoCharacter = '*'
+
 	// Initialize menu items
 	menuItems := []menuItem{
 		{
@@ -340,12 +560,8 @@ func Init() {
 			description: "View real-time server logs with scrolling and filtering",
 		},
 		{
-			title:       "About",
-			description: "Information about QuattriniTrack application",
-		},
-		{
-			title:       "Settings",
-			description: "Configure application settings and preferences",
+			title:       "Login/Register",
+			description: "Authenticate with your credentials or create a new account",
 		},
 		{
 			title:       "Exit",
@@ -359,6 +575,10 @@ func Init() {
 			currentScreen: menuScreen,
 			menuItems:     menuItems,
 			selectedItem:  0,
+			emailInput:    emailInput,
+			passwordInput: passwordInput,
+			focusedInput:  0,
+			authMode:      loginMode,
 		},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
