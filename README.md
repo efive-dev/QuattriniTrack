@@ -4,6 +4,7 @@ The app is built using the following technologies:
 - The **Go** programming language. Using its rich standard library for all its features, especially to manage the underlying **REST API** of the program.
 - The **SQLC** package to manage the database (in this case a local sqlite db). Fantastic way to write directly SQL queries and schemas and then translate it in a type safe manner to use in the program.
 - The **Charm** ecosystem for the *TUI* (terminal user interface). The user is meant to use the program through the TUI, but the REST API remains available to be used through other means (such as curl).
+
 The project has also a minimal test suite. To run the test use: ```go test ./tests/*```
 
 ## How to run
