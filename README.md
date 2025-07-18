@@ -58,6 +58,10 @@ Authentication is handled using JWT (JSON Web Tokens). To access protected route
 | DELETE | `/category`    | Delete a category        | Yes           |
 | GET    | `/me`          | Get current user profile | Yes           |
 
+Certain endpoints also allow filtering with query parameters:
+- ```/transaction``` allows to filter based on id, categories_id and name.
+- ```/category``` allows to filter based on id.
+
 ### Sample curl requests
 1. Register a new user (public)
 ```bash
