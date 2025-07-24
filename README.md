@@ -11,13 +11,22 @@ The app is built using the following technologies:
 
 The project has also a minimal test suite. To run the test use: `go test ./tests/*`
 
+## Feautures
+- Terminal based interface for managing your finances.
+- REST API with secure JWT based authentication.
+- User registration and login.
+- Track expenses and categorize transactions.
+- Filter transactions based on date, id or name.
+- SQLite database with type-safe access via SQLC.
+- Minimal test suite for key functionality. 
+
 ## How to run
 
 First of all make sure you have installed both the Go programming language and SQLC. Also the experience will be way smoother using a terminal with _ANSI_ support. A step by step guide is the following:
 
 - Clone the repository: `git clone https://github.com/efive-dev/QuattriniTrack.git`.
 - Navigate to the main directory where you cloned the repository.
-- Create a _.env_ file and in the first line insert `JWT_SECRET = "your_secret_key"`, your_secret_key should be generated through a trusted service but any string will work.
+- Create a _.env_ file and in the first line insert `JWT_SECRET="your_secret_key"`, your_secret_key should be generated through a trusted service but any string will work.
 - Run the program: `go run .`
 - Use the program through the TUI. The API will be available on the following address: `http://localhost:8080/`.
 
